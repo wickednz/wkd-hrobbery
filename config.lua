@@ -31,8 +31,8 @@ Config.maxMoney = 300
 --If true a drop with the robbery items will be made at the door. If false it will be put into players inventory regardless of free space. 
 Config.drop = false
 
---Will show polyzone boxes
-Config.debug = false
+--Will show polyzone boxes and get player data/initilise polyzone on script restart.
+Config.debug = true
 
 -- Remove lockpick on failed attempt
 Config.removeLockpickOnFail = true
@@ -83,7 +83,7 @@ Config.pedModel = {
 Config.findableItems = { --Items that can be found 
 [1] = 'tosti',
 [2] = 'twerks_candy',
---[3] = 'sandwhich',
+--[3] = 'sandwhich', -- Broken
 [4] = 'joint',
 [5] = 'vodka',
 [6] = 'screwdriverset',
@@ -119,3 +119,30 @@ Config.npcWeapons = {
 [9] = 0x94117305, -- Poolcue
 
 }
+
+-- May use this in future to add a rarity aspect to the items
+-- Config.findableItems = { --Items that can be found 
+-- ['tosti'] = 10,
+-- ['twerks_candy'] = 10,
+-- ['sandwhich'] = 6,
+-- ['joint'] = 2,
+-- ['vodka'] = 5,
+-- ['screwdriverset'] = 4,
+-- ['drill'] = 6,
+-- ['electronickit'] = 4,
+-- ['repairkit'] = 2,
+-- ['jerry_can'] = 3,
+-- ['bandage'] = 8,
+-- ['laptop'] = 8,
+-- ['tablet'] = 7,
+-- ['phone'] = 8,
+-- ['radio'] = 4,
+-- ['fitbit'] = 4,
+-- ['rolex'] = 2,
+-- ['diamond_ring'] = 2,
+-- ['goldchain'] = 3,
+-- ['10kgoldchain'] = 1,
+-- ['firework1'] = 1,
+-- ['binoculars'] = 2
+
+-- }

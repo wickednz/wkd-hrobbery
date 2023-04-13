@@ -13,32 +13,7 @@ local itemTable = Config.findableItems
 local pedTable = Config.pedModel
 local moneyRecvd = 0
 local itemstoReceive = {}
-
--- Config.findableItems = { --Items that can be found 
--- ['tosti'] = 10,
--- ['twerks_candy'] = 10,
--- ['sandwhich'] = 6,
--- ['joint'] = 2,
--- ['vodka'] = 5,
--- ['screwdriverset'] = 4,
--- ['drill'] = 6,
--- ['electronickit'] = 4,
--- ['repairkit'] = 2,
--- ['jerry_can'] = 3,
--- ['bandage'] = 8,
--- ['laptop'] = 8,
--- ['tablet'] = 7,
--- ['phone'] = 8,
--- ['radio'] = 4,
--- ['fitbit'] = 4,
--- ['rolex'] = 2,
--- ['diamond_ring'] = 2,
--- ['goldchain'] = 3,
--- ['10kgoldchain'] = 1,
--- ['firework1'] = 1,
--- ['binoculars'] = 2
-
--- }
+local randomped = nil 
 
 function dump(o)
 	if type(o) == 'table' then
@@ -73,12 +48,6 @@ function MonitorPOS()
 	end)
 end
 
-function generateRandomPed()
-	local randomped = pedTable[math.random(1, #pedTable)]
-	RequestModel(randomped)
-	return randomped
-end
-
 function startSkillCheck(location, k)
 	local success = lib.skillCheck('medium', {'w', 'a', 's', 'd'})
 
@@ -102,7 +71,7 @@ function checkStatus(location, k)
 	end, currentRobbery)
 end
 
-function webhookPost(item)
+function webhookPost(item, money)
 	local s1 = GetStreetNameAtCoord(currentRobbery.x, currentRobbery.y, currentRobbery.z)
 	local streetLabel = GetStreetNameFromHashKey(s1)
 	local iteminfo = ' '
@@ -140,7 +109,7 @@ function webhookPost(item)
 				},
 				{
 					name = Lang[Config.Lang]['moneytaken'],
-					value = '$' .. tostring(moneyRecvd),
+					value = '$' .. tostring(money),
 					inline = true
 				},
 			};
@@ -153,13 +122,11 @@ function webhookPost(item)
 	};
 	
 	TriggerServerEvent('kz-hrobbery:server:webhook', data)
-	moneyRecvd = 0
 end
 
 function findMoney(amount)
 	TriggerServerEvent('kz-hrobbery:server:payCash', src, amount)
 	WKD.Functions.Notify(Lang[Config.Lang]['found'] .. ' ' .. Config.currency .. amount, "success")
-	moneyRecvd = amount
 end
 
 function lockpickdone(locksuccess)
@@ -247,7 +214,7 @@ function giveRandomItems()
 	if next(itemstoReceive) then 
 		WKD.Functions.Notify({text = Lang[Config.Lang]['items_found'], caption =  dump(itemsReceived)}, 'success' , 10000)
 	end
-	webhookPost(itemsReceived)
+	webhookPost(itemsReceived, recieveMoney)
 	currentRobbery = nil 
 end
 
@@ -263,7 +230,11 @@ function startRobbery(location, name)
     local randomWeapon = Config.npcWeapons[math.random(1 , 9)]
 	local ammo = 1
 	local zoneName = tostring(name)
-	local randomped = generateRandomPed()
+	randomped = pedTable[math.random(1, #pedTable)]
+	RequestModel(randomped)
+	while not HasModelLoaded(randomped) do
+		Wait(0)
+	end
 
 	if randomWeapon == 0x1B06D571 then 
 		ammo = 30
@@ -324,6 +295,8 @@ function startSearching()
 		robberyStarted = false
 		giveRandomItems()
 		lib.hideTextUI()
+		SetModelAsNoLongerNeeded(randomped)
+		randomped = nil
 	else 
 		WKD.Functions.Notify(Lang[Config.Lang]['failed'], "error")
 		searching = false
