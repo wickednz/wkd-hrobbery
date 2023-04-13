@@ -1,17 +1,44 @@
 QBCore = exports["qb-core"]:GetCoreObject()
+local WKD = exports["wkd-utils"]:utils()
 
 --Variables
+local Player = nil
+local name = nil
+local citizenid = nil
 local robberyStarted = false
-local nobodyhome = false
 local currentRobbery = nil
 local hasMoved = false
-local hasBeenRobbed = false
 local searching = false
 local itemTable = Config.findableItems
 local pedTable = Config.pedModel
-local testing = true 
 local moneyRecvd = 0
-local success = nil
+local itemstoReceive = {}
+
+-- Config.findableItems = { --Items that can be found 
+-- ['tosti'] = 10,
+-- ['twerks_candy'] = 10,
+-- ['sandwhich'] = 6,
+-- ['joint'] = 2,
+-- ['vodka'] = 5,
+-- ['screwdriverset'] = 4,
+-- ['drill'] = 6,
+-- ['electronickit'] = 4,
+-- ['repairkit'] = 2,
+-- ['jerry_can'] = 3,
+-- ['bandage'] = 8,
+-- ['laptop'] = 8,
+-- ['tablet'] = 7,
+-- ['phone'] = 8,
+-- ['radio'] = 4,
+-- ['fitbit'] = 4,
+-- ['rolex'] = 2,
+-- ['diamond_ring'] = 2,
+-- ['goldchain'] = 3,
+-- ['10kgoldchain'] = 1,
+-- ['firework1'] = 1,
+-- ['binoculars'] = 2
+
+-- }
 
 function dump(o)
 	if type(o) == 'table' then
@@ -34,7 +61,7 @@ function MonitorPOS()
 				local difference = #(pos - currentRobbery)   
 				if difference > 7 then
 					hasMoved = true
-					KZNotify("You have moved too far away, robbery cancelled")
+					WKD.Functions.Notify(Lang[Config.Lang]['moved_too_far'], 'error')
 					robberyStarted = false
 					currentRobbery = nil
 					hasMoved = false
@@ -47,32 +74,35 @@ function MonitorPOS()
 end
 
 function generateRandomPed()
-	local itemchance = math.random(1 , 2)
-	if chance == 1 then 
-		nobodyhome = true
-	elseif chance == 2 then 
-		nobodyhome = false
-	elseif chance == 3 then 
-		nobodyhome = true
-	end
-	randomped = pedTable[math.random(1, #pedTable)]
-	RequestModel(randomped)    
+	local randomped = pedTable[math.random(1, #pedTable)]
+	RequestModel(randomped)
+	return randomped
 end
 
-function checkStatus()
+function startSkillCheck(location, k)
+	local success = lib.skillCheck('medium', {'w', 'a', 's', 'd'})
+
+	if success then 
+		startRobbery(location, k)
+	end
+
+end
+
+function checkStatus(location, k)
 	QBCore.Functions.TriggerCallback("kz-hrobbery:server:isitRobbed", function(cb)
-		if cb == true then
-			hasBeenRobbed = true
+		if cb then
+			WKD.Functions.Notify(Lang[Config.Lang]['already_hit'], 'error', 5000)
 		else
-			hasBeenRobbed = false
+			if Config.skillCheck then 
+				startSkillCheck(location, k)
+			else
+				startRobbery(location, k)
+			end
 		end
 	end, currentRobbery)
 end
 
 function webhookPost(item)
-	local Player = QBCore.Functions.GetPlayerData()
-	local name = Player.charinfo.firstname .. ' ' .. Player.charinfo.lastname
-	local citizenid = Player.citizenid
 	local s1 = GetStreetNameAtCoord(currentRobbery.x, currentRobbery.y, currentRobbery.z)
 	local streetLabel = GetStreetNameFromHashKey(s1)
 	local iteminfo = ' '
@@ -80,42 +110,42 @@ function webhookPost(item)
 	if item ~= nil and type(item) == 'table' then 
 		iteminfo = dump(item)
 	else
-		iteminfo = 'Nothing'
+		iteminfo = Lang[Config.Lang]['nothing']
 	end
 		
 	local data = {
 		["embeds"] = {{ 
 			color = 16776960;
-			title = 'House Robbery';
+			title = Lang[Config.Lang]['house_rob'];
 			fields = {
 				{
-					name = "Thief",
+					name = Lang[Config.Lang]['theif'],
 					value = name,
 					inline = true
 				},
 				{
-					name = "Citizen ID",
+					name = Lang[Config.Lang]['cid'],
 					value = citizenid,
 					inline = true
 				},
 				{
-					name = "Location",
+					name = Lang[Config.Lang]['loc'],
 					value = streetLabel,
 					inline = true
 				},
 				{
-					name = "Items Taken",
-					value = iteminfo,
+					name =Lang[Config.Lang]['itemtaken'],
+					value = '| ' .. iteminfo,
 					inline = true
 				},
 				{
-					name = "Money Taken",
+					name = Lang[Config.Lang]['moneytaken'],
 					value = '$' .. tostring(moneyRecvd),
 					inline = true
 				},
 			};
 			footer = {
-				["text"] = 'kz-houserobbery';
+				["text"] = 'wkd-houserobbery';
 				};
 			}};
 		["content"] = '';
@@ -128,198 +158,178 @@ end
 
 function findMoney(amount)
 	TriggerServerEvent('kz-hrobbery:server:payCash', src, amount)
-	KZNotify("Found $" .. amount, "success")
+	WKD.Functions.Notify(Lang[Config.Lang]['found'] .. ' ' .. Config.currency .. amount, "success")
 	moneyRecvd = amount
 end
 
 function lockpickdone(locksuccess)
-	
-	print(locksuccess)
 	if not locksuccess then 
 		if Config.removeLockpickOnFail then 
 			TriggerServerEvent('kz-hrobbery:server:removeItem')
 		end
 	end
 	
-	success = locksuccess
-	
 	Wait(5000)
 	minigameStarted = false
-	success = nil
 end
 
-function checkHasItem()
-	QBCore.Functions.TriggerCallback('kz-hrobbery:server:gotItem', function(lockpickQ) 
-		if lockpickQ ~= nil and lockpickQ.amount >= 1 then 
-			minigameStarted = true 
-			TriggerEvent('qb-lockpick:client:openLockpick', lockpickdone)
-		else
-			KZNotify('You do not have the correct supplies', 'error', 5000)
-			success = false
+
+function setContains(set, key)
+    return set[key] ~= nil
+end
+
+function loadRandomItems()
+	local rollAmount = Config.rollAmount
+	
+	if Config.chancePercentage == 100 then 
+		for i = 1, rollAmount do
+			local itemQuantity = math.random(1, Config.MaxItems)
+			local randomItem = itemTable[math.random(1, #itemTable)]
+			if not setContains(itemstoReceive, randomItem) then 
+				itemstoReceive[randomItem] = itemQuantity
+			end
 		end
-	end) 
+	elseif Config.chancePercentage == 75 then 
+		for i = 1, rollAmount do 
+			local itemchance = math.random(1, 3)
+			local itemQuantity = math.random(1, Config.MaxItems)
+			local randomItem = itemTable[math.random(1, #itemTable)]
+			if itemchance == 2 or chance == 3 then
+				if not setContains(itemstoReceive, randomItem) then 
+					itemstoReceive[randomItem] = itemQuantity
+				end
+			end
+		end
+	elseif Config.chancePercentage == 50 then 
+		for i = 1, rollAmount do 
+			local itemchance = math.random(1, 2)
+			local itemQuantity = math.random(1, Config.MaxItems)
+			local randomItem = itemTable[math.random(1, #itemTable)]
+			if itemchance == 1 then
+				if not setContains(itemstoReceive, randomItem) then 
+					itemstoReceive[randomItem] = itemQuantity
+				end
+			end
+		end		
+	elseif Config.chancePercentage == 25 then 
+		for i = 1, rollAmount do 
+			local itemchance = math.random(1, 4)
+			local itemQuantity = math.random(1, Config.MaxItems)
+			local randomItem = itemTable[math.random(1, #itemTable)]
+			if itemchance == 1 then
+				if not setContains(itemstoReceive, randomItem) then 
+					if not setContains(itemstoReceive, randomItem) then 
+						itemstoReceive[randomItem] = itemQuantity
+					end
+				end
+			end
+		end	
+	end
+end
+
+function giveRandomItems()
+	local itemsReceived = {}
+	local PlayerData = QBCore.Functions.GetPlayerData()
+	local identifier = PlayerData.license
+	local playerId = (GetPlayerServerId(PlayerId()))
+	if itemstoReceive then 
+		for k, v in pairs(itemstoReceive) do
+			table.insert(itemsReceived, {['items'] = k .. ' x ' .. v .. ' |'})
+		end
+		TriggerServerEvent('wkd-hrobbery:server:giveItems', playerId, itemstoReceive, currentRobbery)
+	else
+		WKD.Functions.Notify(Lang[Config.Lang]['no_valuables'], "error")
+	end
+	local recieveMoney = math.random(0 , Config.maxMoney)
+	if recieveMoney >= 1 then 
+		findMoney(recieveMoney)
+	end
+	if next(itemstoReceive) then 
+		WKD.Functions.Notify({text = Lang[Config.Lang]['items_found'], caption =  dump(itemsReceived)}, 'success' , 10000)
+	end
+	webhookPost(itemsReceived)
+	currentRobbery = nil 
+end
+
+function alertAuthorities(location)
+	print('Please provide police dispatch code at line 265 in client.lua')
 end
 
 function startRobbery(location, name) 
 	local src = source
     local ped = PlayerPedId()
+	local pedChance = math.random(1 , 2)
 	local playerHeading = GetEntityHeading(ped)
-    local chance = math.random(1 , 9)
+    local randomWeapon = Config.npcWeapons[math.random(1 , 9)]
+	local ammo = 1
 	local zoneName = tostring(name)
-	local nobodyhome = true
+	local randomped = generateRandomPed()
 
-	if not hasBeenRobbed then 
-		
-		checkHasItem()
-
-		while success == nil do
-			Wait(50)
-		end
-
-		if success then 
-			
-			KZRobberyStarted(location)
-			MonitorPOS()
-			TriggerServerEvent('kz-hrobbery:server:robbed', currentRobbery)
-			
-			--if nobodyhome == false then --Spawn a ped.
-			if not testing then 
-				robberyStarted = true
-				local angryPed = CreatePed(0, randomped, location.x, location.y, location.z, playerHeading - 180.00, true, true)   
-				TaskCombatPed(angryPed, ped, 0, 16)
-				if chance == 1 then -- Give ped a knife
-					GiveWeaponToPed(angryPed, 0x92A27487, 1, false, true)
-				elseif chance == 2 then --Give ped a gun
-					GiveWeaponToPed(angryPed, 0x1B06D571, 30, false, true)
-				elseif chance == 3 then --give ped a bat
-					GiveWeaponToPed(angryPed, 0x958A4A8F, 1, false, true)  
-				elseif chance == 4 then --give ped a broken bottle
-					GiveWeaponToPed(angryPed, 0xF9E6AA4B, 1, false, true)  
-				elseif chance == 5 then --Give ped a hammer
-					GiveWeaponToPed(angryPed, 0x4E875F73, 1, false, true)  
-				elseif chance == 6 then --Give ped a golfclub
-					GiveWeaponToPed(angryPed, 0x440E4788, 1, false, true)  
-				elseif chance == 7 then --Give ped a hatchet
-					GiveWeaponToPed(angryPed, 0xF9DCBF2D, 1, false, true)  
-				elseif chance == 8 then --Give ped a fist
-					GiveWeaponToPed(angryPed, 0xA2719263, 1, false, true)
-				elseif chance == 9 then --give ped a poolcue
-					GiveWeaponToPed(angryPed, 0x94117305, 1, false, true)  
-				end  
-			elseif nobodyhome == true then
-				robberyStarted = true
-				KZNotify("No one is home")
-			end 
-		else
-			robberyStarted = false
-			KZNotify('Robbery Failed', 'error', 5000)
-		end
-	else
-		KZNotify('This place has already been hit', 'error', 5000)
+	if randomWeapon == 0x1B06D571 then 
+		ammo = 30
 	end
+	
+	MonitorPOS()
+	TriggerServerEvent('kz-hrobbery:server:robbed', currentRobbery)
+		
+	if pedChance == 2 then --Spawn a ped.
+		robberyStarted = true
+		local angryPed = CreatePed(0, randomped, location.x, location.y, location.z, playerHeading - 180.00, true, true)   
+		TaskCombatPed(angryPed, ped, 0, 16)
+		GiveWeaponToPed(angryPed, randomWeapon, ammo, false, true)
+		CreateThread(function()
+			while robberyStarted do 
+				Wait(5000)
+				local Player = QBCore.Functions.GetPlayerData()
+				if Player.metadata.isdead or Player.metadata.inlaststand then 
+					alertAuthorities(location)
+					robberyStarted = false
+					WKD.Functions.Notify(Lang[Config.Lang]['failed'], 'error', 5000)
+				end
+			end
+		end)
+		
+	elseif pedChance == 1 then  -- Dont spawn a ped 
+		robberyStarted = true
+		WKD.Functions.Notify(Lang[Config.Lang]['nobody_home'])
+	end 
+
 end
 
 function startSearching()
 	local ped = PlayerPedId()
-	local searchTime = Config.SearchTime
-    
+	loadRandomItems()
+
 	searching = true 
-	
-	QBCore.Functions.Progressbar("repair_vehicle", "Searching...", searchTime, false, true, {
-		disableMovement = true,
-		disableCarMovement = true,
-		disableMouse = false,
-		disableCombat = true,
-	}, {
-		animDict = "mini@repair",
-		anim = "fixing_a_player",
-		flags = 16,
-	}, {}, {}, function() -- Done
-		StopAnimTask(ped, "mini@repair", "fixing_a_player", 1.0)
+
+	lib.showTextUI(Lang[Config.Lang]['cancelprogress'])
+
+	if lib.progressCircle({
+		duration = Config.searchTime,
+		position = 'bottom',
+		useWhileDead = false,
+		canCancel = true,
+		disable = {
+			car = true,
+		},
+		anim = {
+			dict = 'mini@repair',
+			clip =  "fixing_a_player"
+		},
+		disable = {
+			move = true
+		}
+	}) then 
 		searching = false
 		robberyStarted = false
 		giveRandomItems()
-	end, function() -- Cancel
-		StopAnimTask(ped, "mini@repair", "fixing_a_player", 1.0)
-		KZNotify("Failed", "error")
+		lib.hideTextUI()
+	else 
+		WKD.Functions.Notify(Lang[Config.Lang]['failed'], "error")
 		searching = false
 		robberyStarted = false
 		currentRobbery = nil 
-	end)
-end
-
-function giveRandomItems()
-	local recieveItemChance = Config.recieveItemChance
-	local itemstoReceive = {}
-	
-	if Config.chancePercentage == 100 then 
-		for i = 1, recieveItemChance do
-			local randomItem = itemTable[math.random(1, #itemTable)]
-			table.insert(itemstoReceive, {randomItem})
-		end
-		local recieveMoney = math.random(0 , Config.maxMoney)
-		if recieveMoney >= 1 then 
-			findMoney(recieveMoney)
-		end
-	elseif Config.chancePercentage == 75 then 
-		for i = 1, recieveItemChance do 
-			local itemchance = math.random(1, 3)
-			local randomItem = itemTable[math.random(1, #itemTable)]
-			if itemchance == 2 or chance == 3 then
-				table.insert(itemstoReceive, {randomItem})
-			end
-		end
-		local moneychance = math.random(1, 3)
-		local recieveMoney = math.random(0 , Config.maxMoney)
-		if recieveMoney >= 1 and moneychance == 2 or moneychance == 3 then
-			findMoney(recieveMoney)
-		end
-		
-	elseif Config.chancePercentage == 50 then 
-		for i = 1, recieveItemChance do 
-			local itemchance = math.random(1, 2)
-			local randomItem = itemTable[math.random(1, #itemTable)]
-			if itemchance == 1 then
-				table.insert(itemstoReceive, {randomItem})
-			end
-		end
-		local moneychance = math.random(1, 2)
-		local recieveMoney = math.random(0 , Config.maxMoney)
-		if recieveMoney >= 1 and moneychance == 2 then
-			findMoney(recieveMoney)
-		end
-		
-	elseif Config.chancePercentage == 25 then 
-		for i = 1, recieveItemChance do 
-			local itemchance = math.random(1, 4)
-			local randomItem = itemTable[math.random(1, #itemTable)]
-			if itemchance == 1 then
-				table.insert(itemstoReceive, {randomItem})
-			end
-		end	
-		local moneychance = math.random(1, 4)
-		local recieveMoney = math.random(0 , Config.maxMoney)
-		if recieveMoney >= 1 and moneychance == 1 then
-			findMoney(recieveMoney)
-		end
-	end
-
-	if itemstoReceive[1] then 
-		local itemsReceived = {}
-		for _, v in pairs(itemstoReceive) do 
-			for _, items in pairs(v) do
-			local itemQuantity = math.random(1, Config.MaxItems)
-			TriggerServerEvent('QBCore:Server:AddItem', items, itemQuantity)
-			KZNotify('Found ' .. itemQuantity .. ' x ' .. items, 'success', 5000)
-			table.insert(itemsReceived, {['items'] = itemQuantity .. ' x ' .. items})
-			end
-		end
-		webhookPost(itemsReceived)
-		currentRobbery = nil 
-	else
-		KZNotify("No Valuables Found...", "error")
-		webhookPost()
-		currentRobbery = nil 
+		lib.hideTextUI()
 	end
 end
 
@@ -329,28 +339,27 @@ function initLocations()
 		exports['qb-target']:AddBoxZone(tostring(k), vector3(location.x, location.y, location.z), 1.5, 1.6, { 
 		name = tostring(k), 
 		heading = 12.0, 
-		debugPoly = false, 
+		debugPoly = Config.debug, 
 		minZ = 36.7, 
 		maxZ = 44.00,
 		}, {
 		options = { 
 			{
-			label = 'Break In',
+			label = Lang[Config.Lang]['break_in'],
 			canInteract = function(entity, distance, data) 
+				currentRobbery = vector3(location.x, location.y, location.z)
 				if robberyStarted then 
 					return false
-				end 
-				return true
+				else 
+					return true
+				end
 			end,
-				action = function(entity) 
-					currentRobbery = location     
-					checkStatus()
-					generateRandomPed()
-					startRobbery(location, k)
+				action = function(entity)
+					checkStatus(location, k)
 				end,
 			},
 			{ 
-				label = 'Search Property',
+				label = Lang[Config.Lang]['search_prop'],
 				canInteract = function(entity, distance, data) 
 					if robberyStarted and not searching then 
 						return true
@@ -358,7 +367,7 @@ function initLocations()
 					return false
 				end,
 				action = function(entity)
-					startSearching() 
+					startSearching()
 				end,
 			}
 		},
@@ -369,8 +378,24 @@ end
 
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
 	initLocations()
+	Player = QBCore.Functions.GetPlayerData()
+	name = Player.charinfo.firstname .. ' ' .. Player.charinfo.lastname
+	citizenid = Player.citizenid
 end)
 
-initLocations()
+if Config.debug then 
+	initLocations()
+	Player = QBCore.Functions.GetPlayerData()
+	name = Player.charinfo.firstname .. ' ' .. Player.charinfo.lastname
+	citizenid = Player.citizenid
+end
+
+Citizen.CreateThread(function()
+	while true do
+		Wait(2000)
+		--print(WKD.Shared.dump(itemstoReceive))
+	end
+
+end)
 
 

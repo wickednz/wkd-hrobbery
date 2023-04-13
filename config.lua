@@ -1,8 +1,12 @@
 Config = {}
 
+Config.Lang = 'en'
+
+Config.currency = '$'
+
 --How long the search takes. 10 - 30 Seconds
 --Config.SearchTime = math.random(10000, 30000)
-Config.SearchTime = 5000
+Config.searchTime = 5000
 
 -- How long before a location can be robbed again
 Config.Cooldown = 900000 --15 Minutes 
@@ -12,20 +16,29 @@ Config.MoneyType = 'cash'
 --Max quantity of items to recieve
 Config.MaxItems = 4
 
+--Enable a skill check before robbery
+Config.skillCheck = true
+
 -- How many times to "roll the dice" for items
-Config.recieveItemChance = 2 
+Config.rollAmount = 6
 
 -- 0, 25, 50, 75 or 100 percent chance that something will be found for money and items
-Config.chancePercentage = 25
+Config.chancePercentage = 75
 
 --Maximum money that can be recieved from a robbery
 Config.maxMoney = 300 
+
+--If true a drop with the robbery items will be made at the door. If false it will be put into players inventory regardless of free space. 
+Config.drop = false
+
+--Will show polyzone boxes
+Config.debug = false
 
 -- Remove lockpick on failed attempt
 Config.removeLockpickOnFail = true
 
 --Webhook url for discord logging
-Config.WebhookURL = 'https://discord.com/api/webhooks/954727633072062514/63viLjAiBBvoGjPK8c7_dwXL524UnQxWbq9uXV-tQqNp4mitpBDFFsEpTmtBbdjiCysB'
+Config.WebhookURL = ''
 
 Config.robberyLocations = {
 
@@ -70,7 +83,7 @@ Config.pedModel = {
 Config.findableItems = { --Items that can be found 
 [1] = 'tosti',
 [2] = 'twerks_candy',
-[3] = 'sandwhich',
+--[3] = 'sandwhich',
 [4] = 'joint',
 [5] = 'vodka',
 [6] = 'screwdriverset',
@@ -90,5 +103,19 @@ Config.findableItems = { --Items that can be found
 [20] = '10kgoldchain',
 [21] = 'firework1',
 [22] = 'binoculars'
+
+}
+
+Config.npcWeapons = {
+
+[1] = 0x92A27487, -- Knife
+[2] = 0x1B06D571, -- Gun
+[3] = 0x958A4A8F, -- Bat
+[4] = 0xF9E6AA4B, -- Broken Bottle
+[5] = 0x4E875F73, -- Hammer
+[6] = 0x440E4788, -- Golfclub
+[7] = 0xF9DCBF2D, -- Hatchet 
+[8] = 0xA2719263, -- Fist
+[9] = 0x94117305, -- Poolcue
 
 }

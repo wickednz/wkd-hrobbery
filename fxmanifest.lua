@@ -2,9 +2,11 @@
 fx_version 'cerulean'
 games { 'rdr3', 'gta5' }
 
-author 'KZ-Modifications'
+author 'wickednz'
 description 'Simple House robbery for QBCore'
-version '1.0.0'
+version '2.0.0'
+
+lua54 'yes'
 
 -- What to run
 client_scripts {
@@ -17,10 +19,14 @@ server_script 'server.lua'
 
 shared_scripts {
     'config.lua',
+    'locales/*.lua',
+    '@ox_lib/init.lua'
+
 }
 
 dependencies {
     'PolyZone',
     'qb-target',
+    'wkd-utils'
 }
 
