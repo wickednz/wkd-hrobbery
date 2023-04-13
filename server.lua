@@ -5,7 +5,6 @@ local robbed = {}
 
 RegisterNetEvent('kz-hrobbery:server:robbed', function(currentRobbery)
    table.insert(robbed, currentRobbery)
-   print(currentRobbery)
 end)
 
 function dump(o)
