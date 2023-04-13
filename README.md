@@ -1,5 +1,5 @@
 # wkd-hrobbery
-Simple house robbery script for QB-Core. 
+Simple house robbery script for Five-M and QB-Core. 
 
 ![alt text](https://cdn.discordapp.com/attachments/955981405387628545/1096192691953479780/hrobbery.png)
 
